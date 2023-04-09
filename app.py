@@ -3,27 +3,35 @@ from bs4 import BeautifulSoup
 import re
 import openai
 import requests
+from pydub import AudioSegment
+import os
 
 
 app = Flask(__name__)
 
-@app.route
+@app.route('/')
 def index():
     return render_template('index.html')
 
 @app.route('/', methods=['POST'])
 def submit_url():
     url = request.form['url']
-    message = f'您好，{url}'
+    message = f'您好，{url}\n'
 
-    # file_name = download_mp3(url)
-    file_name = 'Audio1.mp3'
-    message+= f'\n已下載完成:{file_name}'
 
-    message+= f'\n摘要：{summary(file_name)}'
+    # download mp3
+    file_name = download_mp3(url)
+    message+= f'{file_name}已下載完成\n'
 
-    # text = transcript(file_name)
-    # message += f'\nTranscript:{text}'
+    # split mp3
+    segment_length = 600000  # 10 minutes
+    output_folder_path = "sliced_audio_files"
+    split_audio_file(file_name, segment_length, output_folder_path)
+
+    transcript_text = merged_transcript(output_folder_path)
+    message+= f'\n\nTranscript:\n{transcript_text}'
+
+    message+= f'\n\n摘要：\n{summary(file_name)}'
     
     return render_template('index.html', message=message)
 
@@ -42,6 +50,25 @@ def transcript(file_name):
         out.write(transcript_text)    
 
     return transcript_text
+
+def merged_transcript(output_folder_path):
+    
+    files = os.listdir(output_folder_path)
+
+    text = ''
+
+    for file in files:
+        file_path = os.path.join(output_folder_path, file)
+        print(file, file_path)
+        
+        temp = transcript(file_path)
+
+        print(text, '\n')
+
+        text += temp
+
+    return text        
+
 
 # Summary audio
 def summary(file_name):
@@ -92,7 +119,7 @@ def download_mp3(url):
 
     # Construct the File name
     # file_name = f'{name} ({date}).mp3'
-    file_name = 'Audio1.mp3'
+    file_name = 'Audio.mp3'
 
     # Fetch each episode and write the file
     podcast = requests.get(url)
@@ -100,6 +127,40 @@ def download_mp3(url):
         out.write(podcast.content)    
     
     return file_name
+    
+def split_audio_file(input_file_path, segment_length, output_folder_path):
+
+    # Initialize output_folder
+    files = os.listdir(output_folder_path)
+
+    for file in files:
+        file_path = os.path.join(output_folder_path, file)
+
+        if os.path.isfile(file_path):
+            os.remove(file_path)
+    
+
+    # Load the audio file
+    audio_file = AudioSegment.from_mp3(input_file_path)
+
+    # Calculate the total length of the audio file (in milliseconds)
+    total_length = len(audio_file)
+
+    # Initialize the starting time for slicing
+    start_time = 0
+
+    # Iterate through the audio file, incrementing the slicing length each time
+    for i in range(0, total_length, segment_length):
+        end_time = start_time + segment_length
+
+        # Slice the audio file
+        sliced_audio_file = audio_file[start_time:end_time]
+
+        # Export the sliced audio file
+        sliced_audio_file.export(f"{output_folder_path}/sliced_audio_{i // segment_length}.mp3", format="mp3")
+
+        # Update the starting time for slicing
+        start_time = end_time
 
 if __name__ == '__main__':
     app.run(debug=True)
