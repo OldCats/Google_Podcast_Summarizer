@@ -4,3 +4,5 @@ setuptools
 urllib3
 pydub
 streamlit
+openai
+langchain
