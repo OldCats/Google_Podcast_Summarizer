@@ -1,5 +1,5 @@
 beautifulsoup4
-python==3.9.12
+python
 requests
 setuptools
 urllib3
