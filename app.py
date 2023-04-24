@@ -1,62 +1,43 @@
-from flask import Flask, render_template, request
+import streamlit as st
+# from flask import Flask, render_template, request
 from bs4 import BeautifulSoup
 import re
 import openai
 import requests
 from pydub import AudioSegment
 import os
+import unstructured
+from langchain.document_loaders import UnstructuredFileLoader
 
+from langchain.llms import OpenAI
+from langchain.chains.summarize import load_summarize_chain
+from langchain.prompts import PromptTemplate
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-app = Flask(__name__)
-
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-
-@app.route('/', methods=['POST'])
-def submit_url():
-    url = request.form['url']
-    message = f'您好，{url}\n'
-
-
-    # download mp3
-    file_name = 'Audio.mp3'
-    download_mp3(url, file_name)
-    message+= f'{file_name}已下載完成\n'
-
-    # split mp3, stored in dir of sliced_audio_files
-    segment_length = 600000  # 10 minutes
-    output_folder_path = "sliced_audio_files"
-    split_audio_file(file_name, segment_length, output_folder_path)
-
-    # transcript
-    transcript_text = merged_transcript(output_folder_path)
-    message+= f'\n\nTranscript:\n{transcript_text}\n\n'
-
-    message+= f'\n\n摘要：\n{summary(transcript_text)}\n\n'
-    
-    return render_template('index.html', message=message)
 
 
 # Whishper api
-def transcript(file_name):
-    f = open('./TOKEN', encoding='utf-8')
-    openai.api_key = f.read()
-    f.close()
+def transcript(file_name, TOKEN):
+    openai.api_key = TOKEN
     
     audio_file = open(file_name, 'rb')
-    transcript_text = openai.Audio.transcribe('whisper-1', audio_file).text
-    print(transcript_text)
     
+    try:
+        transcript_text = openai.Audio.transcribe('whisper-1', audio_file).text
+    except openai.error.AuthenticationError as e:
+        return e
+    
+    except Exception as e:
+        return e
 
-    with open(f'./{file_name}.txt', 'w', encoding='utf-8') as out:
-        out.write(transcript_text)    
+    else:
+        with open(f'./{file_name}.txt', 'w', encoding='utf-8') as out:
+            out.write(transcript_text)    
 
-    return transcript_text
+        return transcript_text
 
 
-def merged_transcript(output_folder_path):
+def merged_transcript(output_folder_path, TOKEN):
     
     files = os.listdir(output_folder_path)
     files = sorted(files)
@@ -67,8 +48,9 @@ def merged_transcript(output_folder_path):
         file_path = os.path.join(output_folder_path, file)
         print(file, file_path)
         
-        temp = transcript(file_path)
+        temp = transcript(file_path, TOKEN)
 
+        print(temp)
         print(text, '\n')
 
         text += temp
@@ -77,21 +59,27 @@ def merged_transcript(output_folder_path):
 
 
 # Summary audio
-def summary(transcript_text):
+def summary(transcript_text, TOKEN):
     
-    completion = openai.ChatCompletion.create(
-    model="gpt-3.5-turbo",
-    messages=[
-        {"role": "system", "content": "摘要以下文字"},
-        {"role": "user", "content": transcript_text}
-    ]
-    )
+    # completion = openai.ChatCompletion.create(
+    # model="gpt-3.5-turbo",
+    # messages=[
+    #     {"role": "system", "content": "摘要以下文字"},
+    #     {"role": "user", "content": transcript_text}
+    # ]
+    # )
 
-    result = completion.choices[0].message.content
+    # result = completion.choices[0].message.content
 
-    print(result)
+    llm = OpenAI(temperature=0, openai_api_key=TOKEN)
+    chain = load_summarize_chain(llm, chain_type='refine', verbose=True)
 
-    return result
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+    split_docs = text_splitter.create_documents([transcript_text])
+
+    print(split_docs)
+
+    return chain.run(input_documents=split_docs)
 
 
 def download_mp3(url, file_name):
@@ -122,6 +110,9 @@ def download_mp3(url, file_name):
     podcast = requests.get(url)
     with open(rf'{out_dir}\{file_name}', 'wb') as out:
         out.write(podcast.content)    
+    
+    episode_info = f'{name}, {date}'
+    return episode_info
     
     
 def split_audio_file(input_file_path, segment_length, output_folder_path):
@@ -158,6 +149,83 @@ def split_audio_file(input_file_path, segment_length, output_folder_path):
         # Update the starting time for slicing
         start_time = end_time
 
-if __name__ == '__main__':
-    app.run(debug=True)
+def check_api_key(TOKEN):
+    
+    try:
+        openai.api_key = TOKEN
+        response = openai.Completion.create(
+            engine = 'text-davinci-002',
+            prompt = 'test api key',
+            max_tokens = 10,
+            n = 1,
+            stop = None, 
+            temperature=0.5
+        )
+        return True
+        
+    except Exception as e:
+        error_message = "Error" + str(e) + '\n'
+        return error_message
 
+def progress(progress_bar, progress_text, progress):
+    progress_bar.progress(progress, text=progress_text)
+
+    return progress_bar
+    
+
+def main():
+    st.write("""
+    # Google Podcast Summarizer
+    """)
+
+    OPEN_AI_APIKEY = st.text_input('Enter openai [apikey](https://platform.openai.com/account/api-keys):', 'sk-......')
+
+    example_url = 'https://podcasts.google.com/feed/aHR0cHM6Ly9mZWVkcy5zb3VuZG9uLmZtL3BvZGNhc3RzL2UwYmFjYTk4LTQ5MGQtNGY0NC04M2M5LTMyZjhlYzhlZWM0NS54bWw/episode/NDg5YTUxNTgtMmI3My00OTQwLWE5OWYtNDc4MTA2ZGM4NmQ1?sa=X&ved=0CAUQkfYCahcKEwj4zcPSwMH-AhUAAAAAHQAAAAAQLA'
+    url = st.text_input('Enter the URL of a [Google podcasts](https://podcasts.google.com/) episode:', example_url)
+    submit = st.button('Summarize')
+    
+    st.divider()
+    
+    if submit:
+        progress_bar = st.progress(0, text = 'start...')
+        progress(progress_bar, 'Checking api key...', 0.1)
+        st.divider()
+        
+        is_valid = check_api_key(OPEN_AI_APIKEY)
+
+        if is_valid == True:
+
+            # download mp3
+            progress(progress_bar, 'Downloading mp3...', 0.3)
+            file_name = 'Audio.mp3'
+            episode_info = download_mp3(url, file_name)
+            st.write(f'Episode: **{episode_info}** downloaded.')
+
+
+            # split mp3, stored in dir of sliced_audio_files
+            progress(progress_bar, 'Processing mp3...', 0.5)
+            segment_length = 600000  # 10 minutes
+            output_folder_path = "sliced_audio_files"
+            split_audio_file(file_name, segment_length, output_folder_path)
+
+            # transcript
+            progress(progress_bar, 'Transcript mp3...', 0.7)
+            transcript_text = merged_transcript(output_folder_path, OPEN_AI_APIKEY)
+            st.write('Generate transcript:')
+            st.write(transcript_text)
+
+            st.divider()
+
+            progress(progress_bar, 'Summarizing mp3...', 0.9)
+            st.write('Summary:')
+            st.write(summary(transcript_text, OPEN_AI_APIKEY))
+
+            progress(progress_bar, 'Finished. Scorll down to view transcript and summary', 1.0)
+
+        else:
+            st.write(is_valid)
+
+
+if __name__ == "__main__":
+
+    main()
