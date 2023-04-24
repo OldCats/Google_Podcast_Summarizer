@@ -6,7 +6,6 @@ import openai
 import requests
 from pydub import AudioSegment
 import os
-import unstructured
 from langchain.document_loaders import UnstructuredFileLoader
 
 from langchain.llms import OpenAI
