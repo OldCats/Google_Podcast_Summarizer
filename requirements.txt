@@ -1,5 +1,4 @@
 beautifulsoup4
-python
 requests
 setuptools
 urllib3
