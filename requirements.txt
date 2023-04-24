@@ -1,7 +1,7 @@
-beautifulsoup4==4.11.1
+beautifulsoup4
 python==3.9.12
-requests==2.28.1
-setuptools==63.4.1
-urllib3==1.26.12
+requests
+setuptools
+urllib3
 pydub
 streamlit
