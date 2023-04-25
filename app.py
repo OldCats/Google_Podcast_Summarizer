@@ -107,7 +107,7 @@ def download_mp3(url, file_name):
 
     # Fetch each episode and write the file
     podcast = requests.get(url)
-    with open(rf'{out_dir}\{file_name}', 'wb') as out:
+    with open(rf'{out_dir}/{file_name}', 'wb') as out:
         out.write(podcast.content)    
     
     episode_info = f'{name}, {date}'
@@ -117,6 +117,9 @@ def download_mp3(url, file_name):
 def split_audio_file(input_file_path, segment_length, output_folder_path):
 
     # Initialize output_folder
+    if not os.path.exists(output_folder_path):
+        os.mkdir(output_folder_path)
+
     files = os.listdir(output_folder_path)
 
     for file in files:
