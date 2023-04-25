@@ -6,3 +6,4 @@ pydub
 streamlit
 openai
 langchain
+ffmpeg-python
