@@ -236,7 +236,6 @@ def main():
         progress(progress_bar, 'Finished. Scorll down to view transcript and summary', 1.0)
 
     if st.session_state['button_transcript']:
-        st.write(st.session_state['episode_text'])
         st.subheader('Generate transcript')
         st.write(st.session_state['transcript_text'])
 
