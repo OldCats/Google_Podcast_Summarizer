@@ -4,6 +4,8 @@ setuptools
 urllib3
 pydub
 streamlit
+streamlit_extras
 openai
 langchain
 ffmpeg-python
+llama_index
