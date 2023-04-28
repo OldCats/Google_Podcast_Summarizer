@@ -13,9 +13,8 @@ from llama_index import GPTSimpleVectorIndex
 
 
 # Whishper api
-def transcript(file_name, TOKEN):
-    openai.api_key = TOKEN
-    
+def transcript(file_name):
+    openai.api_key = st.session_state['OPEN_AI_APIKEY']
     audio_file = open(file_name, 'rb')
     
     try:
