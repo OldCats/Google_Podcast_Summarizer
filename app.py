@@ -43,10 +43,7 @@ def merged_transcript(output_folder_path, TOKEN):
         file_path = os.path.join(output_folder_path, file)
         print(file, file_path)
         
-        temp = transcript(file_path, TOKEN)
-
-        print(temp)
-        print(text, '\n')
+        temp = transcript(file_path)
 
         text += temp
 
