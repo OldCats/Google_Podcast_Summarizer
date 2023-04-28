@@ -230,7 +230,7 @@ def main():
 
         # transcript
         progress(progress_bar, 'Transcript mp3...', 0.7)
-        st.session_state['transcript_text'] = transcript(file_name)
+        st.session_state['transcript_text'] = merged_transcript(output_folder_path, st.session_state['OPEN_AI_APIKEY'])
 
         progress(progress_bar, 'Finished. Scorll down to view transcript and summary', 1.0)
 
